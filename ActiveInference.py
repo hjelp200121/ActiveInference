@@ -15,7 +15,7 @@ class ActiveAgent:
         self.temperature = temperature #How much should lower EFE actions be prioritized if not deterministic
         self.preference = preference #What is the preference for not colliding ###Denne her er dårlig obv og skal måske ændres?
         self.policyDiscount = policyDiscount #Discount to future policies
-
+    
         ###Lav nogle input checks her
 
         #Get variables from the environment
