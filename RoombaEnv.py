@@ -275,3 +275,4 @@ class RoombaEnv(gym.Env):
 
 if __name__ == "__main__":
     env = RoombaEnv((10,10), "binary", False, "preset", 10000, "human", 0)
+    env.reset()

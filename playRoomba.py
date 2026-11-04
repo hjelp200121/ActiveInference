@@ -1,7 +1,7 @@
 import pygame
 from RoombaEnv import RoombaEnv
 
-env = RoombaEnv((10,10), "binary", True, "preset", 10000, "human", 0)
+env = RoombaEnv((10,10), "binary", False, "preset", 10000, "human", 0)
 obs, info = env.reset()
 while True:
     for event in pygame.event.get():

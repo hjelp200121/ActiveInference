@@ -111,7 +111,7 @@ if __name__ == "__main__":
     import imageio.v2 as imageio
 
     show = True
-    filename = "ActiveInference/Roomba/gifs/roombaActiveInference.gif"
+    filename = "gifs/roombaActiveInference.gif"
 
     env = RoombaEnv((10,10), "binary", True, "preset", 10000, None, 0.0) ###sæt tilbage til true
     envVariables = (env.width, env.height, env.observationMode, env.noiseLevel)
