@@ -3,7 +3,7 @@ import pygame
 
 # Chatgpt helped with coding the render part
 class RoombaVisualizer:
-    def __init__(self, env, agent, cellSize=23, headerHeight=30, displayFps=10):
+    def __init__(self, env, agent, cellSize=40, headerHeight=30, statusHeight=40, displayFps=10):
         pygame.font.init()
 
         self.pygame = pygame
@@ -12,6 +12,7 @@ class RoombaVisualizer:
 
         self.cellSize = cellSize
         self.headerHeight = headerHeight
+        self.statusHeight = statusHeight
         self.displayFps = displayFps
 
         self.panelWidth = env.width * cellSize
@@ -19,8 +20,8 @@ class RoombaVisualizer:
         self.rowHeight = self.panelHeight + headerHeight
 
         # Two columns and three rows.
-        self.canvasWidth = 2 * self.panelWidth
-        self.canvasHeight = 3 * self.rowHeight
+        self.canvasWidth = 3 * self.panelWidth
+        self.canvasHeight = statusHeight + 2 * self.rowHeight
 
         # This is just an off-screen drawing surface.
         self.canvas = pygame.Surface((self.canvasWidth, self.canvasHeight))
@@ -30,21 +31,35 @@ class RoombaVisualizer:
         self.quitRequested = False
 
         self.titleFont = pygame.font.SysFont(None, 22)
+        self.status_font = pygame.font.SysFont(None, 25)
 
         self.panelTitles = [
-            ["real: Roomba position", "belief: Roomba position"],
-            ["real: Obstacles",       "belief: Obstacles"],
-            ["real: Combined",        "belief: Combined"],
+            ["real: Roomba position", "real: Obstacles", "real: Combined"],
+            ["belief: Roomba position", "belief: Obstacles", "belief: Combined"],
         ]
 
-    def render(self, showWindow=False):
+    def render(self, showWindow=False, optimalMoves=None, currentMoves=0, lastMoves=None):
         pygame = self.pygame
         self.canvas.fill((250, 250, 250))
 
-        for row in range(3):
-            for col in range(2):
+        optText = (str(optimalMoves) if optimalMoves is not None else "N/A")
+
+        lastText = (str(lastMoves) if lastMoves is not None else "N/A")
+
+        text = [f"Optimal moves: {optText}", f"Current moves: {currentMoves}", f"Last environment: {lastText}"]
+
+        for col, text in enumerate(text):
+            showText = self.status_font.render(text, True,(30, 30, 30))
+            center = (col * self.panelWidth + self.panelWidth // 2)
+            textBox = showText.get_rect(center=(center, self.statusHeight // 2))
+            self.canvas.blit(showText, textBox)
+
+        pygame.draw.line(self.canvas, (100, 100, 100), (0, self.statusHeight - 1), (self.canvasWidth, self.statusHeight - 1), width=1)
+
+        for row in range(2):
+            for col in range(3):
                 x = col * self.panelWidth
-                y = row * self.rowHeight
+                y = self.statusHeight + row * self.rowHeight
 
                 # Draw the panel header.
                 title = self.panelTitles[row][col]
@@ -58,11 +73,11 @@ class RoombaVisualizer:
                 panelSurface = self.canvas.subsurface(panelRect)
 
                 #Column 1: real
-                if col == 0:
-                    if row == 0:
+                if row == 0:
+                    if col == 0:
                         self.env.drawPanel(panelSurface, self.cellSize, True, False)
 
-                    elif row == 1:
+                    elif col == 1:
                         self.env.drawPanel(panelSurface, self.cellSize, False, True)
 
                     else:
@@ -70,8 +85,7 @@ class RoombaVisualizer:
 
                 #Column 2: belief
                 else:
-                    mode = ["position", "blocks", "combined"][row]
-                    self.agent.drawBeliefPanel(panelSurface, self.cellSize, mode)
+                    self.agent.drawBeliefPanel(panelSurface, self.cellSize, ["position", "blocks", "combined"][col])
 
                 # Draw a frame around each panel.
                 pygame.draw.rect(self.canvas, (100, 100, 100), pygame.Rect(x, y, self.panelWidth, self.rowHeight), width=1)
@@ -107,29 +121,37 @@ class RoombaVisualizer:
 if __name__ == "__main__":
     from RoombaEnv import RoombaEnv
     from ActiveInference import ActiveAgent
-    from ActiveVisualizer import RoombaVisualizer
+    from OptimalMoves import optimalPath
     import imageio.v2 as imageio
 
+    randomStart = False
     show = True
     filename = "gifs/roombaActiveInference.gif"
 
-    env = RoombaEnv((10,10), "binary", True, "preset", 10000, None, 0.0) ###sæt tilbage til true
+    env = RoombaEnv((10,10), "binary", randomStart, "preset", 10000, None, 0.0) ###sæt tilbage til true
     envVariables = (env.width, env.height, env.observationMode, env.noiseLevel)
     agent = ActiveAgent(envVariables)
     visualizer = RoombaVisualizer(env, agent)
 
     with imageio.get_writer(filename, mode="I", fps=10, loop=0) as writer:
         obs, info = env.reset()
-        writer.append_data(visualizer.render(show))
+        agent.resetEpisode(fullReset=True, randomStart=randomStart)
+        optimalMoves = optimalPath(env.grid, 1000, 1000)
+        currentMoves = 0
+        lastMoves = None
+        writer.append_data(visualizer.render(show, optimalMoves, currentMoves, lastMoves))
         while True:
             action = agent.chooseAction()
             obs, reward, terminated, truncated, info = env.step(action)
+            currentMoves += 1
             agent.update(action, obs)
-            writer.append_data(visualizer.render(show))
+            writer.append_data(visualizer.render(show, optimalMoves, currentMoves, lastMoves))
 
             if terminated or truncated:
                 obs, info = env.reset()
-                agent.resetEpisode()
+                agent.resetEpisode(randomStart=randomStart)
+                lastMoves = currentMoves
+                currentMoves = 0
 
             if visualizer.quitRequested:
                 break

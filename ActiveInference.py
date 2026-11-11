@@ -44,9 +44,7 @@ class ActiveAgent:
         #C model, currently just the preference for not colliding
         self.C = np.array([self.preference, 1 - self.preference], dtype=np.float64)
 
-        self.resetEpisode(fullReset=True)
-
-    def resetEpisode(self, fullReset=False):
+    def resetEpisode(self, fullReset=False, randomStart=True):
         #Call after environment reset
         #Gives starting B model from D model (not saved explicit)
 
@@ -55,13 +53,14 @@ class ActiveAgent:
 
         ###Skal måske også resette noget af dens belief om blocke? 
 
-        #Changes position prior to be weighted towards cells the agent think is free based on earlier environments
-        startWeights = np.clip(1.0 - self.blockBelief, 1e-9, 1.0)
-        self.positionBelief = startWeights / startWeights.sum()
+        if randomStart == True:
+            #Changes position prior to be weighted towards cells the agent think is free based on earlier environments
+            startWeights = np.clip(1.0 - self.blockBelief, 1e-9, 1.0)
+            self.positionBelief = startWeights / startWeights.sum()
+        else:
+            self.positionBelief = np.zeros_like(self.blockBelief, dtype=np.float64)
+            self.positionBelief[0] = 1.0
 
-        #If known starting position (for testing)
-        # self.positionBelief = np.zeros_like(self.blockBelief, dtype=np.float64)
-        # self.positionBelief[0] = 1.0
         if self.positionBelief.max() > 1.0:
             raise ValueError("Position belief > 1 after reseting episode")
 
