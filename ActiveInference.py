@@ -225,7 +225,7 @@ class ActiveAgent:
     def drawBeliefPanel(self, surface, cellSize=50, mode="position", blockThreshold=0.8, posThreshold=0.5):
         import pygame
 
-        if mode not in {"position", "blocks", "combined"}:
+        if mode not in {"position", "blocks", "explored", "combined"}:
             raise ValueError("mode in drawBeliefPanel must be 'position', 'blocks' or 'combined'")
 
         def blend(a, b, amount):
@@ -234,6 +234,7 @@ class ActiveAgent:
         red = (128,0,0)
         black = (0,0,0)
         blue = (50, 100, 220)
+        green = (0, 128, 0)
         for y in range(self.height):
             for x in range(self.width):
                 rect = pygame.Rect(x*cellSize, y*cellSize, cellSize, cellSize)
@@ -255,6 +256,10 @@ class ActiveAgent:
                         color = black
                     else:
                         color = red
+
+                elif mode == "explored":
+                    probExplore = self.exploredBelief[idx]
+                    color = blend(red, green, probExplore)
 
                 else: #position
                     probPos = self.positionBelief[idx]

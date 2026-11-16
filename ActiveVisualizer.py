@@ -20,7 +20,7 @@ class RoombaVisualizer:
         self.rowHeight = self.panelHeight + headerHeight
 
         # Two columns and three rows.
-        self.canvasWidth = 3 * self.panelWidth
+        self.canvasWidth = 4 * self.panelWidth
         self.canvasHeight = statusHeight + 2 * self.rowHeight
 
         # This is just an off-screen drawing surface.
@@ -34,8 +34,8 @@ class RoombaVisualizer:
         self.status_font = pygame.font.SysFont(None, 25)
 
         self.panelTitles = [
-            ["real: Roomba position", "real: Obstacles", "real: Combined"],
-            ["belief: Roomba position", "belief: Obstacles", "belief: Combined"],
+            ["real: Roomba position", "real: Obstacles", "real: Explored", "real: Combined"],
+            ["belief: Roomba position", "belief: Obstacles", "belief: Explored", "belief: Combined"],
         ]
 
     def render(self, showWindow=False, optimalMoves=None, currentMoves=0, lastMoves=None):
@@ -57,7 +57,7 @@ class RoombaVisualizer:
         pygame.draw.line(self.canvas, (100, 100, 100), (0, self.statusHeight - 1), (self.canvasWidth, self.statusHeight - 1), width=1)
 
         for row in range(2):
-            for col in range(3):
+            for col in range(4):
                 x = col * self.panelWidth
                 y = self.statusHeight + row * self.rowHeight
 
@@ -74,18 +74,11 @@ class RoombaVisualizer:
 
                 #Column 1: real
                 if row == 0:
-                    if col == 0:
-                        self.env.drawPanel(panelSurface, self.cellSize, True, False)
-
-                    elif col == 1:
-                        self.env.drawPanel(panelSurface, self.cellSize, False, True)
-
-                    else:
-                        self.env.drawPanel(panelSurface, self.cellSize, True, True)
+                    self.env.drawPanel(panelSurface, ["position", "blocks", "explored", "combined"][col], self.cellSize)
 
                 #Column 2: belief
                 else:
-                    self.agent.drawBeliefPanel(panelSurface, self.cellSize, ["position", "blocks", "combined"][col])
+                    self.agent.drawBeliefPanel(panelSurface, self.cellSize, ["position", "blocks", "explored", "combined"][col])
 
                 # Draw a frame around each panel.
                 pygame.draw.rect(self.canvas, (100, 100, 100), pygame.Rect(x, y, self.panelWidth, self.rowHeight), width=1)

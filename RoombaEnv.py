@@ -186,7 +186,7 @@ class RoombaEnv(gym.Env):
 
             self.clock = pygame.time.Clock()
 
-        self.drawPanel(self.window)
+        self.drawPanel(self.window, "combined")
         if self.renderMode == "human":
             pygame.event.pump()
             pygame.display.flip()
@@ -199,33 +199,35 @@ class RoombaEnv(gym.Env):
             # Gymnasium convention is (height, width, channels)
             return np.transpose(array, (1, 0, 2))
 
-    def drawPanel(self, surface, cellSize=50, showRoomba=True, showBlocks=True):
+    def drawPanel(self, surface, mode, cellSize=50):
         import pygame
         for y in range(self.height):
             for x in range(self.width):
                 rect = pygame.Rect(x*cellSize, y*cellSize, cellSize, cellSize)
                 objectType = self.grid[y, x]
 
-                ###Aflys denne her hvis det er showblocks
+                if mode == "explored":
+                    print()
+
                 # Cleared cell
                 if objectType == 1:
                     color = (0, 128, 0) #green
 
                 elif objectType == -1:
-                    if showRoomba:
+                    if mode in ("roomba", "combined"):
                         #Roomba
                         color = (128, 128, 128) #grey
                     else:
                         # Cleared cell (because the roomba is on top)
                         color = (0, 128, 0) #green
 
-                elif showBlocks:
-                    # Wall
-                    if objectType == 2:
-                        color = (0, 0, 0) #black
-                    
+                # Wall
+                elif objectType == 2:
+                    color = (0, 0, 0) #black
+
+                elif mode in ("blocks", "combined"):
                     # Table
-                    elif objectType == 3:
+                    if objectType == 3:
                         color = (101, 67, 33) #dark brown
                     
                     # Sofa
@@ -244,10 +246,14 @@ class RoombaEnv(gym.Env):
                     else:
                         color = (128,0,0) #red
 
-                # Wall
-                elif objectType == 2:
-                    color = (0, 0, 0) #black
-                
+                elif mode in ("explored"):
+                    if objectType in (3, 4, 5, 6):
+                        color = (0, 128, 0) #green
+
+                    # Empty cell
+                    else:
+                        color = (128,0,0) #red         
+
                 # Empty cell
                 else:
                     color = (128,0,0) #red
@@ -256,7 +262,7 @@ class RoombaEnv(gym.Env):
                 pygame.draw.rect(surface, (180, 180, 180), rect, width=1)
 
         #draw roomba again as circle
-        if showRoomba:
+        if mode in ("roomba", "combined"):
             x, y = self.roombaPosition
             center = (x*cellSize + cellSize//2, y * cellSize + cellSize//2)
             radius = cellSize//3
