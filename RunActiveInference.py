@@ -4,11 +4,14 @@ from ActiveInference import ActiveAgent
 show = "human"
 player = "random"
 
-env = RoombaEnv((10,10), "binary", True, "preset", 10000, show, 0)
+randomStart = True
+
+env = RoombaEnv((10,10), "binary", randomStart, "preset", 10000, show, 0)
 envVariables = (env.width, env.height, env.observationMode, env.noiseLevel)
 agent = ActiveAgent(envVariables)
 
 obs, info = env.reset()
+agent.resetEpisode(fullReset=True, randomStart=randomStart)
 while True:
     if player == "ai":
         action = agent.chooseAction()
@@ -19,4 +22,4 @@ while True:
 
     if terminated or truncated:
         obs, info = env.reset()
-        agent.resetEpisode()
+        agent.resetEpisode(randomStart=randomStart)
