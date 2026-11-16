@@ -168,8 +168,11 @@ class ActiveAgent:
         probObs = self._observationProbabilities(probCol)
 
         ###Kig lige på risk igen
-        risk = np.sum(exploredBelief * np.log(exploredBelief / self.C) + (1 - exploredBelief) * np.log((1 - exploredBelief)/(1 - self.C)))
+        ##Kl divergence risk
+        ##risk = np.sum(exploredBelief * np.log(exploredBelief / self.C) + (1 - exploredBelief) * np.log((1 - exploredBelief)/(1 - self.C)))
 
+        ##expected negative log preference risk
+        risk = -np.sum(exploredBelief * np.log(self.C) + (1 - exploredBelief) * np.log1p(-self.C))
         information = self._binaryEntropy(probObs[1]) #- self._binaryEntropy(self.noiseLevel) This is a constant and since all policies are equally long we can cut it out
 
         if information < 0.0:

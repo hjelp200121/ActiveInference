@@ -124,7 +124,7 @@ if __name__ == "__main__":
     from OptimalMoves import optimalPath
     import imageio.v2 as imageio
 
-    randomStart = False
+    randomStart = True
     show = True
     filename = "gifs/roombaActiveInference.gif"
 
