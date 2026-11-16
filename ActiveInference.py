@@ -5,7 +5,7 @@ from itertools import product
 #Based on the book Fundamentals of active inference
 #Uses a factorised binary map for its beliefs
 class ActiveAgent:
-    def __init__(self, envVariables, initialObstacleProbability=0.2, horizon=3, temperature=4.0, preference=0.5, policyDiscount=1.0, seed=None):
+    def __init__(self, envVariables, initialObstacleProbability=0.2, horizon=3, temperature=4.0, preference=0.9, policyDiscount=1.0, seed=None):
 
         self.rng = np.random.default_rng(seed) #Used for picking random actions
 
@@ -41,8 +41,8 @@ class ActiveAgent:
                 if target in self.positionIndex:
                     self.actionOutcome[i, j] = self.positionIndex[target]
 
-        #C model, currently just the preference for not colliding
-        self.C = np.array([self.preference, 1 - self.preference], dtype=np.float64)
+        #C model, prefers to visit all cells with self.preference weight
+        self.C = np.full(self.numCells, self.preference, dtype=np.float64)
 
     def resetEpisode(self, fullReset=False, randomStart=True):
         #Call after environment reset
@@ -64,6 +64,8 @@ class ActiveAgent:
         if self.positionBelief.max() > 1.0:
             raise ValueError("Position belief > 1 after reseting episode")
 
+        self.exploredBelief = self.positionBelief.copy()
+
     def _collisionProbabilities(self, blockBelief, action):
         #Calculates P(collision| position, action, map belief)
         targets = self.actionOutcome[:, action]
@@ -81,7 +83,7 @@ class ActiveAgent:
         probColObs = probCol * (1.0 - self.noiseLevel) + (1.0 - probCol) * self.noiseLevel
         return np.array([1.0 - probColObs, probColObs], dtype=np.float64)
 
-    def _inferObservation(self, positionBelief, blockBelief, action, observation, test=False):
+    def _inferObservation(self, positionBelief, blockBelief, exploredBelief, action, observation):
         #Calculates the updated beliefs after action and observation
 
         collisionProb = self._collisionProbabilities(blockBelief, action)
@@ -94,8 +96,16 @@ class ActiveAgent:
 
         #Calculate the probability, given current beliefs, that the observation is true
         likelihoodTruth = collisionProb * likelihoodCol + (1 - collisionProb) * likelihoodMove #Given position, how much do we believe the observation
-        probTruth = positionBelief @ likelihoodTruth
-        probTruth = np.clip(probTruth, 1e-15, 1) #The prob sometimes becomes 1.0000000000000002 due error in the normalisation of the position belief
+
+        #Update explored belief
+        ### check igen
+        sourcePosterior = positionBelief * likelihoodTruth
+        sourcePosterior = sourcePosterior / sourcePosterior.sum()
+        targetProb = np.zeros(self.numCells, dtype=np.float64)
+        targets = self.actionOutcome[:,action]
+        valid = targets >= 0
+        np.add.at(targetProb, targets[valid], sourcePosterior[valid])
+        nextExplore = 1 - (1 - exploredBelief) * (1 - targetProb)
 
         #Update position belief
         nextPos = np.zeros(self.numCells, dtype=np.float64)
@@ -112,6 +122,9 @@ class ActiveAgent:
             nextPos = nextPos / nextPos.sum()
 
         #Update map belief
+        probTruth = positionBelief @ likelihoodTruth
+        probTruth = np.clip(probTruth, 1e-15, 1) #The prob sometimes becomes 1.0000000000000002 due error in the normalisation of the position belief
+
         ###Skal lige checke denne her igen
         nextMap = blockBelief.copy()
         for cell in range(self.numCells):
@@ -136,11 +149,11 @@ class ActiveAgent:
         # if test:
         #     print("hej")
 
-        return nextPos, nextMap
+        return nextPos, nextMap, nextExplore
 
     def update(self, action, observation):
         #Updates the agent
-        self.positionBelief, self.blockBelief = self._inferObservation(self.positionBelief, self.blockBelief, action, observation, True)
+        self.positionBelief, self.blockBelief, self.exploredBelief = self._inferObservation(self.positionBelief, self.blockBelief, self.exploredBelief, action, observation)
 
     @staticmethod
     def _binaryEntropy(probability):
@@ -148,28 +161,29 @@ class ActiveAgent:
             return 0.0
         return -probability * np.log(probability) - (1.0 - probability) * np.log(1.0 - probability)
 
-    def _oneStepEFE(self, positionBelief, blockBelief, action):
+    def _oneStepEFE(self, positionBelief, blockBelief, exploredBelief, action):
         collisionProb = self._collisionProbabilities(blockBelief, action)
         probCol = positionBelief @ collisionProb
         probCol = np.clip(probCol, 0, 1) #The prob sometimes becomes 1.0000000000000002 due error in the normalisation of the position belief
         probObs = self._observationProbabilities(probCol)
 
-        risk = np.sum(probObs * (np.log(np.clip(probObs, 1e-15, 1.0)) - np.log(self.C)))
+        ###Kig lige på risk igen
+        risk = np.sum(exploredBelief * np.log(exploredBelief / self.C) + (1 - exploredBelief) * np.log((1 - exploredBelief)/(1 - self.C)))
 
-        ambiguity = self._binaryEntropy(probObs[1]) - self._binaryEntropy(self.noiseLevel)
+        information = self._binaryEntropy(probObs[1]) #- self._binaryEntropy(self.noiseLevel) This is a constant and since all policies are equally long we can cut it out
 
-        if ambiguity < 0.0:
-            print(f"Negative ambiguity {ambiguity}")
-            ambiguity = 0.0
+        if information < 0.0:
+            print(f"Negative information {information}")
+            information = 0.0
 
-        EFE = risk + ambiguity ###Måske tilføj mere vægt til ambiguity
+        EFE = risk - information ###Måske tilføj mere vægt til information
         return EFE, probObs
 
-    def _evaluatePolicy(self, policy, positionBelief, blockBelief, depth=0):
+    def _evaluatePolicy(self, policy, positionBelief, blockBelief, exploredBelief, depth=0):
         #Recursive function for evaluating policy
 
         action = policy[depth]
-        immediateEFE, probObs = self._oneStepEFE(positionBelief, blockBelief, action)
+        immediateEFE, probObs = self._oneStepEFE(positionBelief, blockBelief, exploredBelief, action)
         if depth >= len(policy) - 1:
             return immediateEFE
         
@@ -177,10 +191,10 @@ class ActiveAgent:
         for obs in (0,1): #act like we have seen observation (no collision) and then after act like we have seen observation collision
             prob = probObs[obs]
             if not prob == 0.0:
-                nextPos, nextMap = self._inferObservation(positionBelief, blockBelief, action, obs)
+                nextPos, nextMap, nextExp = self._inferObservation(positionBelief, blockBelief, exploredBelief, action, obs)
                 if nextPos.sum() == 0.0:
                     continue
-                futureVal = self._evaluatePolicy(policy, nextPos, nextMap, depth + 1)
+                futureVal = self._evaluatePolicy(policy, nextPos, nextMap, nextExp, depth + 1)
                 expectedEFE += prob * futureVal
 
         return immediateEFE + self.policyDiscount * expectedEFE
@@ -190,14 +204,15 @@ class ActiveAgent:
 
         ###Vil gerne lave en mere sofistikeret valg af action, så horizon kan være større
         policies = list(product(range(self.numActions), repeat=self.horizon))
-        EFE = np.array([self._evaluatePolicy(policy, self.positionBelief, self.blockBelief) for policy in policies], dtype=np.float64)
-        shiftedWeights = -self.temperature * (EFE - EFE.min())
-        weights = np.exp(shiftedWeights)
-        policyProbs = weights / weights.sum()
+        EFE = np.array([self._evaluatePolicy(policy, self.positionBelief, self.blockBelief, self.exploredBelief) for policy in policies], dtype=np.float64)
+
 
         if deterministic:
             policyIndex = np.argmin(EFE)
         else:
+            shiftedWeights = -self.temperature * (EFE - EFE.min())
+            weights = np.exp(shiftedWeights)
+            policyProbs = weights / weights.sum()
             policyIndex = self.rng.choice(len(policies), p=policyProbs)
 
         action = policies[policyIndex][0]
