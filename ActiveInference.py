@@ -153,11 +153,11 @@ class ActiveAgent:
         #     print("hej")
 
         if np.isnan(nextPos).any():
-            print(nextPos)
+            breakpoint()
         if np.isnan(nextMap).any():
-            print(nextMap)
+            breakpoint()
         if np.isnan(nextExplore).any():
-            print(nextExplore)
+            breakpoint()
 
         return nextPos, nextMap, nextExplore
 
