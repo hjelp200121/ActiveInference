@@ -100,12 +100,15 @@ class ActiveAgent:
         #Update explored belief
         ### check igen
         sourcePosterior = positionBelief * likelihoodTruth
-        sourcePosterior = sourcePosterior / sourcePosterior.sum()
-        targetProb = np.zeros(self.numCells, dtype=np.float64)
-        targets = self.actionOutcome[:,action]
-        valid = targets >= 0
-        np.add.at(targetProb, targets[valid], sourcePosterior[valid])
-        nextExplore = 1 - (1 - exploredBelief) * (1 - targetProb)
+        if not sourcePosterior.sum() == 0:
+            sourcePosterior = sourcePosterior / sourcePosterior.sum()
+            targetProb = np.zeros(self.numCells, dtype=np.float64)
+            targets = self.actionOutcome[:,action]
+            valid = targets >= 0
+            np.add.at(targetProb, targets[valid], sourcePosterior[valid])
+            nextExplore = 1 - (1 - exploredBelief) * (1 - targetProb)
+        else: 
+            nextExplore = exploredBelief
 
         #Update position belief
         nextPos = np.zeros(self.numCells, dtype=np.float64)
@@ -148,6 +151,13 @@ class ActiveAgent:
 
         # if test:
         #     print("hej")
+
+        if np.isnan(nextPos).any():
+            print(nextPos)
+        if np.isnan(nextMap).any():
+            print(nextMap)
+        if np.isnan(nextExplore).any():
+            print(nextExplore)
 
         return nextPos, nextMap, nextExplore
 

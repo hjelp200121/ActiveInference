@@ -29,6 +29,7 @@ class RoombaVisualizer:
         self.screen = None
         self.clock = None
         self.quitRequested = False
+        self.paused = False
 
         self.titleFont = pygame.font.SysFont(None, 22)
         self.status_font = pygame.font.SysFont(None, 25)
@@ -94,6 +95,24 @@ class RoombaVisualizer:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.quitRequested = True
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_p:
+                        self.paused = not self.paused
+
+            while self.paused:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.quit_requested = True
+
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_p:
+                            self.paused = not self.paused
+
+                if not self.quitRequested:
+                    self.screen.blit(self.canvas, (0, 0))
+                    pygame.display.flip()
+
+                self.clock.tick(self.displayFps)
 
             if not self.quitRequested:
                 self.screen.blit(self.canvas, (0, 0))
