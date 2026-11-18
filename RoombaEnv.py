@@ -12,6 +12,9 @@ class RoombaEnv(gym.Env):
     def __init__(self, gridSize, observationMode, randomStart, obstacleMode, maxSteps, renderMode, noiseLevel):
         super().__init__()
 
+        self.rng = np.random.default_rng(None)
+        print(np.random.get_state())
+
         ###Lav nogle checks om input passer
 
         self.width = gridSize[0]
@@ -75,7 +78,7 @@ class RoombaEnv(gym.Env):
 
         newPos = (x + dx, y + dy)
         #Check collision
-        noiseVal = np.random.rand(1)
+        noiseVal = self.rng.random(1) ###
         obj = self._getObj(newPos)
         if obj == 0 or obj == 1:
             x,y = self.roombaPosition
@@ -153,8 +156,8 @@ class RoombaEnv(gym.Env):
         return
 
     def _randPos(self):
-        x = np.random.randint(1, self.width - 1)
-        y = np.random.randint(1, self.height - 1)
+        x = self.rng.integers(1, self.width - 1) ###
+        y = self.rng.integers(1, self.height - 1) ###
         return x,y
 
     def _getObj(self, position):

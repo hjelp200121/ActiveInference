@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     env = RoombaEnv((10,10), "binary", randomStart, "preset", 10000, None, 0.0) ###sæt tilbage til true
     envVariables = (env.width, env.height, env.observationMode, env.noiseLevel)
-    agent = ActiveAgent(envVariables)
+    agent = ActiveAgent(envVariables, horizon=4)
     visualizer = RoombaVisualizer(env, agent)
 
     with imageio.get_writer(filename, mode="I", fps=10, loop=0) as writer:

@@ -8,6 +8,7 @@ class ActiveAgent:
     def __init__(self, envVariables, initialObstacleProbability=0.2, horizon=3, temperature=4.0, preference=0.9, policyDiscount=1.0, seed=None):
 
         self.rng = np.random.default_rng(seed) #Used for picking random actions
+        print(np.random.get_state())
 
         #Hyper parameters for the agent
         self.initialObstacleProbability = initialObstacleProbability #What is the initial chance of blocks, slightly useless
@@ -81,7 +82,12 @@ class ActiveAgent:
     def _observationProbabilities(self, probCol):
         #A model: P(observation| map belief, position belief, action)
         probColObs = probCol * (1.0 - self.noiseLevel) + (1.0 - probCol) * self.noiseLevel
-        return np.array([1.0 - probColObs, probColObs], dtype=np.float64)
+        prob = np.array([1.0 - probColObs, probColObs], dtype=np.float64)
+        tol = 1e-14
+        prob[prob < tol] = 0.0
+        prob[prob > 1 - tol] = 1.0
+        prob = prob/prob.sum()
+        return prob
 
     def _inferObservation(self, positionBelief, blockBelief, exploredBelief, action, observation):
         #Calculates the updated beliefs after action and observation
@@ -171,6 +177,33 @@ class ActiveAgent:
             return 0.0
         return -probability * np.log(probability) - (1.0 - probability) * np.log(1.0 - probability)
 
+    def _node(self, positionBelief, blockBelief, exploredBelief):
+        return {"pb": positionBelief, "bb": blockBelief, "eb": exploredBelief, "cache": {}}
+
+    def _getPolicyStep(self, node, action, depth, horizon):
+        if action in node["cache"]:
+            return node["cache"][action]
+
+        positionBelief = node["pb"]
+        blockBelief = node["bb"]
+        exploredBelief = node["eb"]
+
+        immediateEFE, probObs = self._oneStepEFE(positionBelief, blockBelief, exploredBelief, action)
+        nextNodes = {}
+
+        if depth < horizon - 1:
+            for obs in (0,1):
+                if probObs[obs] <= 0.0:
+                    continue
+                nextPos, nextMap, nextExp = self._inferObservation(positionBelief, blockBelief, exploredBelief, action, obs)
+                if nextPos.sum() <= 0.0:
+                    continue
+                nextNodes[obs] = self._node(nextPos, nextMap, nextExp)
+
+        result = (immediateEFE, probObs, nextNodes)
+        node["cache"][action] = result
+        return result
+    
     def _oneStepEFE(self, positionBelief, blockBelief, exploredBelief, action):
         collisionProb = self._collisionProbabilities(blockBelief, action)
         probCol = positionBelief @ collisionProb
@@ -192,32 +225,32 @@ class ActiveAgent:
         EFE = risk - information ###Måske tilføj mere vægt til information
         return EFE, probObs
 
-    def _evaluatePolicy(self, policy, positionBelief, blockBelief, exploredBelief, depth=0):
+    def _evaluatePolicy(self, policy, node, depth=0):
         #Recursive function for evaluating policy
 
         action = policy[depth]
-        immediateEFE, probObs = self._oneStepEFE(positionBelief, blockBelief, exploredBelief, action)
+        immediateEFE, probObs, nextNodes = self._getPolicyStep(node, action, depth, len(policy))
         if depth >= len(policy) - 1:
             return immediateEFE
         
         expectedEFE = 0.0
         for obs in (0,1): #act like we have seen observation (no collision) and then after act like we have seen observation collision
             prob = probObs[obs]
-            if not prob == 0.0:
-                nextPos, nextMap, nextExp = self._inferObservation(positionBelief, blockBelief, exploredBelief, action, obs)
-                if nextPos.sum() == 0.0:
-                    continue
-                futureVal = self._evaluatePolicy(policy, nextPos, nextMap, nextExp, depth + 1)
-                expectedEFE += prob * futureVal
+            if prob <= 0.0:
+                continue
+            next = nextNodes[obs]
+            futureEFE = self._evaluatePolicy(policy, next, depth + 1)
+            expectedEFE += prob * futureEFE
 
         return immediateEFE + self.policyDiscount * expectedEFE
 
     def chooseAction(self, deterministic = False):
         #Chose action based on horizon 
+        rootNode = self._node(self.positionBelief, self.blockBelief, self.exploredBelief)
 
         ###Vil gerne lave en mere sofistikeret valg af action, så horizon kan være større
         policies = list(product(range(self.numActions), repeat=self.horizon))
-        EFE = np.array([self._evaluatePolicy(policy, self.positionBelief, self.blockBelief, self.exploredBelief) for policy in policies], dtype=np.float64)
+        EFE = np.array([self._evaluatePolicy(policy, rootNode) for policy in policies], dtype=np.float64)
 
 
         if deterministic:
