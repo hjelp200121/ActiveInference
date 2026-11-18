@@ -136,14 +136,19 @@ if __name__ == "__main__":
     from OptimalMoves import optimalPath
     import imageio.v2 as imageio
 
+    #from seeds import seedEnv, seedAgent
+
     randomStart = True
     show = True
     filename = "gifs/roombaActiveInference.gif"
+    seed = 3
 
-    env = RoombaEnv((10,10), "binary", randomStart, "preset", 10000, None, 0.0) ###sæt tilbage til true
+    env = RoombaEnv((10,10), "binary", randomStart, "preset", 10000, None, 0.0, seed) ###sæt tilbage til true
     envVariables = (env.width, env.height, env.observationMode, env.noiseLevel)
-    agent = ActiveAgent(envVariables, horizon=4)
+    agent = ActiveAgent(envVariables, horizon=4, seed=seed)
     visualizer = RoombaVisualizer(env, agent)
+
+    efficiency = []
 
     with imageio.get_writer(filename, mode="I", fps=10, loop=0) as writer:
         obs, info = env.reset()
@@ -160,6 +165,8 @@ if __name__ == "__main__":
             writer.append_data(visualizer.render(show, optimalMoves, currentMoves, lastMoves))
 
             if terminated or truncated:
+                efficiency.append(optimalMoves / currentMoves)
+                print(efficiency)
                 obs, info = env.reset()
                 agent.resetEpisode(randomStart=randomStart)
                 lastMoves = currentMoves

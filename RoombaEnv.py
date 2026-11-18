@@ -9,10 +9,10 @@ class RoombaEnv(gym.Env):
     #actions: up, right, down, left = 0,1,2,3
     #objects: roomba, empty, cleared, wall, table, sofa, couch, chair = -1,0,1,2,3,4,5,6
 
-    def __init__(self, gridSize, observationMode, randomStart, obstacleMode, maxSteps, renderMode, noiseLevel):
+    def __init__(self, gridSize, observationMode, randomStart, obstacleMode, maxSteps, renderMode, noiseLevel, seed=None):
         super().__init__()
 
-        self.rng = np.random.default_rng(None)
+        self.rng = np.random.default_rng(seed)
         print(np.random.get_state())
 
         ###Lav nogle checks om input passer
@@ -208,9 +208,6 @@ class RoombaEnv(gym.Env):
             for x in range(self.width):
                 rect = pygame.Rect(x*cellSize, y*cellSize, cellSize, cellSize)
                 objectType = self.grid[y, x]
-
-                if mode == "explored":
-                    print()
 
                 # Cleared cell
                 if objectType == 1:

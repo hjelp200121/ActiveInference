@@ -196,8 +196,14 @@ class ActiveAgent:
                 if probObs[obs] <= 0.0:
                     continue
                 nextPos, nextMap, nextExp = self._inferObservation(positionBelief, blockBelief, exploredBelief, action, obs)
+                if not np.all(np.isfinite(nextPos)):
+                    raise ValueError(f"Invalid position belief for observation {obs}")
                 if nextPos.sum() <= 0.0:
-                    continue
+                    raise ValueError(
+                    f"Observation {obs} has probability "
+                    f"{probObs[obs]}, but nextPos is zero. "
+                    "Check observation and transition probabilities."
+                    )
                 nextNodes[obs] = self._node(nextPos, nextMap, nextExp)
 
         result = (immediateEFE, probObs, nextNodes)
